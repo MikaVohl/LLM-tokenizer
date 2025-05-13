@@ -39,18 +39,22 @@ class BasicTokenizer():
 
     def encode(self, text):
         ids = list(text.encode("utf-8"))
-        for pair, idx in self.merges:
+        for pair, idx in self.merges.items():
             ids = self.merge(ids, pair, idx)
         return ids
 
 
     def decode(self, ids):
-        pass
+        # build vocab with raw utf values
+        vocab = { idx: bytes([idx]) for idx in range(256)} # maps from integer representation to raw byte
+        for pair, idx in self.merges.items():
+            vocab[idx] = vocab[pair[0]] + vocab[pair[1]]
+        tokens = b"".join(vocab[idx] for idx in ids)
+        text = tokens.decode("utf-8", errors="replace")
+        return text
 
 tok = BasicTokenizer()
 
-msg = "Train brain ainainain test ainainain"
+msg = "Train your tokenizer on whatever text you like and visualize the merged tokens. Do they look reasonable? One default test you may wish to use is the text file tests/taylorswift.txt."
 output = tok.train(msg, 260)
-print(msg)
-print(output)
-print(tok.merges)
+print(tok.decode(tok.encode(msg)) == msg)
