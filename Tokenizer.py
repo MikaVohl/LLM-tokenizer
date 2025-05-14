@@ -115,3 +115,15 @@ print(ids1)
 print(ids2)
 print(text1)
 print(text2)
+
+new_tok = RegexTokenizer()
+new_tok.train("""
+Unfortunately, you will run into two issues:
+
+It is not trivial to recover the raw merges from the GPT-4 tokenizer. You can easily recover what we call vocab here, and what they call and store under enc._mergeable_ranks. Feel free to copy paste the recover_merges function in minbpe/gpt4.py, which takes these ranks and returns the raw merges. If you wish to know how this function works, read this and this. Basically, under some conditions it is enough to only store the parent nodes (and their rank) and get rid of the precise details of which children merged up to any parent.
+Second, the GPT-4 tokenizer for some reason permutes its raw bytes. It stores this permutation in the first 256 elements of the mergeable ranks, so you can recover this byte shuffle relatively simply as byte_shuffle = {i: enc._mergeable_ranks[bytes([i])] for i in range(256)}. In both your encode and decode, you'll have to shuffle bytes around accordingly. If you're stuck, reference the minbpe/gpt4.py` file for hints.
+""", 275)
+ids3 = new_tok.encode(msg)
+text3 = new_tok.decode(ids3)
+print(ids3)
+print(text3)
