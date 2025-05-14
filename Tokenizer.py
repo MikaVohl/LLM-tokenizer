@@ -55,6 +55,7 @@ class BasicTokenizer():
 
 class RegexTokenizer(BasicTokenizer):
     def __init__(self):
+        super().__init__()
         self.GPT4_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
         self.pattern = re.compile(self.GPT4_SPLIT_PATTERN)
 
@@ -72,11 +73,13 @@ class RegexTokenizer(BasicTokenizer):
         self.merges = {}
         for i in range(num_merges):
             stats = self.get_stats(ids_list)
+            if not stats:
+                break
             pair = max(stats, key=stats.get)
             idx = 256 + i
-            for i, ids in enumerate(ids_list):
-                ids_list[i] = self.merge(ids, pair, idx)
-                self.merges[pair] = idx
+            for j, ids in enumerate(ids_list):
+                ids_list[j] = self.merge(ids, pair, idx)
+            self.merges[pair] = idx
         return [token for ids in ids_list for token in ids]
     
     def encode(self, text):
@@ -85,10 +88,6 @@ class RegexTokenizer(BasicTokenizer):
         for match in matched:
             ids_list.append(super().encode(match))
         return [token for ids in ids_list for token in ids]
-    
-    def decode(self, ids):
-        return super().decode(ids)
-
 
 tok1 = BasicTokenizer()
 tok2 = RegexTokenizer()
