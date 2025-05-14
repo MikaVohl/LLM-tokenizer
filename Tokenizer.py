@@ -1,9 +1,12 @@
 import regex as re
-from helper import highlight_tokens
+import tiktoken
+from helper import highlight_tokens, recover_merges
 
 class BasicTokenizer():
-    def __init__(self):
-        self.merges: dict[tuple[int,int],int] = {}
+    def __init__(self, merges: dict[tuple[int,int],int]={}, byte_shuffle={}):
+        self.merges = merges
+        self.byte_shuffle = byte_shuffle
+        self.inverse_byte_shuffle = {v: k for k, v in self.byte_shuffle.items()}
 
     def get_stats(self, ids):
         counts = {}
@@ -38,7 +41,11 @@ class BasicTokenizer():
             
 
     def encode(self, text):
-        ids = list(text.encode("utf-8"))
+        raw_bytes = text.encode("utf-8")
+        if self.byte_shuffle:
+            ids = [ self.byte_shuffle.get(b, b) for b in raw_bytes ]
+        else:
+            ids = list(raw_bytes)
         for pair, idx in self.merges.items():
             ids = self.merge(ids, pair, idx)
         return ids
@@ -50,12 +57,14 @@ class BasicTokenizer():
         for pair, idx in self.merges.items():
             vocab[idx] = vocab[pair[0]] + vocab[pair[1]]
         tokens = b"".join(vocab[idx] for idx in ids)
+        if self.inverse_byte_shuffle:
+            tokens = bytes(self.inverse_byte_shuffle[b] for b in tokens)
         text = tokens.decode("utf-8", errors="replace")
         return text
 
 class RegexTokenizer(BasicTokenizer):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, merges: dict[tuple[int,int],int]={}, byte_shuffle={}):
+        super().__init__(merges, byte_shuffle)
         self.GPT4_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
         self.pattern = re.compile(self.GPT4_SPLIT_PATTERN)
 
@@ -89,16 +98,20 @@ class RegexTokenizer(BasicTokenizer):
             ids_list.append(super().encode(match))
         return [token for ids in ids_list for token in ids]
 
-tok1 = BasicTokenizer()
-tok2 = RegexTokenizer()
 
-msg = "Train your tokenizer on whatever text you like and visualize the merged tokens. Do they look reasonable? One default test you may wish to use is the text file tests/taylorswift.txt."
-output1 = tok1.train(msg, 280)
-output2 = tok2.train(msg, 280)
+msg = "hello world!!!? (안녕하세요!) lol123 😉"
 
-encoded1 = tok1.encode(msg)
-encoded2 = tok2.encode(msg)
-print(tok1.decode(encoded1) == tok2.decode(encoded2))
+enc = tiktoken.get_encoding("cl100k_base") # this is the GPT-4 tokenizer
+ids1 = enc.encode(msg)
+text1 = enc.decode(ids1) # get the same text back
 
-highlight_tokens(encoded1, tok1)
-highlight_tokens(encoded2, tok2)
+byte_shuffle = {i: enc._mergeable_ranks[bytes([i])] for i in range(256)}
+merges = recover_merges(enc._mergeable_ranks)
+tok = RegexTokenizer(merges, byte_shuffle)
+ids2 = tok.encode(msg)
+text2 = tok.decode(ids2)
+
+print(ids1)
+print(ids2)
+print(text1)
+print(text2)
